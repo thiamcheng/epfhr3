@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd        http://camel.apache.org/schema/spring       http://camel.apache.org/schema/spring/camel-spring.xsd">
+    <camelContext id="camel" xmlns="http://camel.apache.org/schema/spring">
+        <route id="_route1">
+            <from id="_from1" uri="netty4-http:http:0.0.0.0:9800/hr"/>
+            <wireTap id="_myTap" uri="direct:hostTap"/>
+            <setHeader headerName="Content-Type" id="_setHeader1">
+                <constant>application/json</constant>
+            </setHeader>
+            <onException id="_onException1" useOriginalMessage="true">
+                <exception>org.apache.camel.component.netty4.http.NettyHttpOperationFailedException</exception>
+                <redeliveryPolicy maximumRedeliveries="2"/>
+                <handled>
+                    <constant>true</constant>
+                </handled>
+                <wireTap id="_myTapError" uri="direct:trapError"/>
+                <log id="_logXX" message="Original Message: ${body}"/>
+                <transform id="_transform1">
+                    <simple>{
+                           "Description": "We encountered an error with the host.",
+                           "Error Details": "Error reported: ",
+                           "Actual Error Stack":  ${exception.message}
+                           }
+                         </simple>
+                </transform>
+                <log id="_logNewHeader" message="Exception message: ${body}"/>
+            </onException>
+            <to id="_to1" uri="netty4-http:http:node-red-git-nodered.mycluster-179309-bee7ed7e116952c03f0e15cdb555fa9a-0000.sng01.containers.appdomain.cloud:80/hr"/>
+            <unmarshal id="_unmarshal1">
+                <json allowUnmarshallType="true" library="Jackson" unmarshalTypeName="org.mycompany.HRResponse"/>
+            </unmarshal>
+            <log id="_log2" message=">> json body ${body.refId} ${body.employeeProfile.name} ${body.employeeProfile.role}"/>
+            <marshal id="_marshal1">
+                <json library="Jackson" unmarshalTypeName="org.mycompany.HRResponse"/>
+            </marshal>
+            <log id="_log1" message=">>> Message : ${body}"/>
+        </route>
+        <route id="_route2">
+            <from id="_from2" uri="direct:hostTap"/>
+            <to id="_to2" uri="netty4-http:http:119.81.166.147:1880/hostTap"/>
+            <log id="_log3" message="body from hostTap ${body}"/>
+        </route>
+        <route id="_route3">
+            <from id="_from3" uri="direct:trapError"/>
+            <to id="_to3" uri="netty4-http:http:119.81.166.147:1880/trapError"/>
+            <log id="_log4" message=">>> Error Original Message ${body}"/>
+        </route>
+    </camelContext>
+</beans>
